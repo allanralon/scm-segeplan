@@ -1849,32 +1849,66 @@ function saveBien(){
   if(!codigo||!tipo||!marca||!clasificacion){showToast('⚠️ Complete los campos obligatorios');return;}
   if(db.bienes.find(b=>b.codigo===codigo&&b.id!==editingBienId)){showToast('⚠️ Código ya existe');return;}
   const bModEl=document.getElementById('bModelo');
-  const obj={
-    id:editingBienId||('b'+Date.now()),
-    codigo,tipo,marca,
+
+  // Payload con claves exactas de Sheets — mismo patrón que saveSeguimiento
+  const bien={
+    id_bien:editingBienId||'',
+    codigo:codigo,
+    tipo:tipo,
+    marca:marca,
     modelo:bModEl?bModEl.value.trim():'',
-    serie:document.getElementById('bSerie').value.trim(),
-    anio:document.getElementById('bAnio').value,
+    anio:document.getElementById('bAnio').value||'',
+    serie:document.getElementById('bSerie').value.trim()||'',
     precio:parseFloat(document.getElementById('bPrecio').value)||0,
-    desc:document.getElementById('bDesc').value.trim(),
-    clasificacion,
-    renglon:document.getElementById('bRenglon').value.trim(),
-    foto:bFotoData||null,
+    descripcion:document.getElementById('bDesc').value.trim()||'',
+    clasificacion:clasificacion,
+    renglon:document.getElementById('bRenglon').value.trim()||'',
     delegacion:currentUser.delegacion||'Global',
-    creadoPor:currentUser.username,
-    creadoEn:new Date().toISOString()
+    foto_url:bFotoData||'',
+    fecha_registro:new Date().toISOString(),
+    registrado_por:currentUser.username
   };
+
+  const payload={
+    accion:'saveBien',
+    bien:bien,
+    usuario:currentUser.username
+  };
+
+  console.log('[saveBien] Enviando a API:', JSON.stringify(payload, null, 2));
   showSpinner('Guardando bien...');
-  api('saveBien',{bien:mapBienToSheet(obj)}).then(function(r){
+
+  fetch(API_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify(payload)
+  }).then(function(r){return r.json();})
+  .then(function(r){
+    console.log('[saveBien] Respuesta de API:', JSON.stringify(r, null, 2));
     hideSpinner();
-    if(!r.ok){apiErr(r.error||'Error al guardar');return;}
-    // Actualizar id si la API retorna uno nuevo
-    if(r.id) obj.id=r.id;
-    if(editingBienId){const idx=db.bienes.findIndex(b=>b.id===editingBienId);if(idx>=0)db.bienes[idx]=obj;}
-    else db.bienes.push(obj);
-    closeModal('bienModal');renderBienes();renderDash();
-    showToast(editingBienId?'✅ Bien actualizado':'✅ Bien registrado');
-  }).catch(function(){hideSpinner();apiErr();});
+    if(!r.ok){apiErr(r.error||'Error al guardar bien');return;}
+    // Recargar desde Sheets para confirmar que el dato llegó
+    showSpinner('Recargando bienes...');
+    fetch(API_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({accion:'getBienes',usuario:currentUser.username})
+    }).then(function(r2){return r2.json();})
+    .then(function(r2){
+      hideSpinner();
+      console.log('[getBienes] Respuesta tras guardar:', r2.ok, 'total:', r2.data&&r2.data.length);
+      if(r2.ok&&Array.isArray(r2.data)) db.bienes=r2.data.map(mapBienFromSheet);
+      closeModal('bienModal');renderBienes();renderDash();
+      showToast(editingBienId?'✅ Bien actualizado':'✅ Bien registrado');
+    }).catch(function(){
+      hideSpinner();
+      closeModal('bienModal');renderBienes();renderDash();
+      showToast(editingBienId?'✅ Bien actualizado':'✅ Bien registrado');
+    });
+  }).catch(function(e){
+    console.error('[saveBien] Error fetch:', e);
+    hideSpinner();apiErr();
+  });
 }
 function previewFoto(input){
   const file=input.files[0];
@@ -2019,51 +2053,67 @@ function saveProg(){
   const months=periodo!=='NA'?getProgSelectedMonths():[];
   if(periodo!=='NA'&&months.length===0){showToast('⚠️ Seleccione al menos un mes');return;}
   const bien=db.bienes.find(b=>b.id===bienId);
-  if(editingProgId){
-    const idx=db.programaciones.findIndex(p=>p.id===editingProgId);
-    const original=db.programaciones[idx];
-    const updated={
-      ...original,
-      tipoMant,periodo,
-      costo:parseFloat(document.getElementById('progCosto').value)||0,
-      months,
-      codigo_bien:bien?bien.codigo:'',
-      editadoPor:currentUser.username,
-      editadoEn:new Date().toISOString()
-    };
-    showSpinner('Guardando programación...');
-    api('saveProgramacion',{programacion:mapProgToSheet(updated)}).then(function(r){
+
+  // Payload con claves exactas de Sheets — mismo patrón que saveSeguimiento
+  const programacion={
+    id_programacion:editingProgId||'',
+    id_bien:bienId,
+    codigo_bien:bien?bien.codigo:'',
+    tipo_mantenimiento:tipoMant,
+    periodicidad:periodo,
+    costo_por_mant:parseFloat(document.getElementById('progCosto').value)||0,
+    anio:parseInt(anio),
+    meses:months.map(function(i){return MONTHS[i];}).join(','),
+    fecha_creacion:new Date().toISOString(),
+    creado_por:currentUser.username
+  };
+
+  const payload={
+    accion:'saveProgramacion',
+    programacion:programacion,
+    usuario:currentUser.username
+  };
+
+  console.log('[saveProg] Enviando a API:', JSON.stringify(payload, null, 2));
+  showSpinner('Guardando programación...');
+
+  fetch(API_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify(payload)
+  }).then(function(r){return r.json();})
+  .then(function(r){
+    console.log('[saveProg] Respuesta de API:', JSON.stringify(r, null, 2));
+    hideSpinner();
+    if(!r.ok){apiErr(r.error||'Error al guardar programación');return;}
+    // Recargar desde Sheets para confirmar que el dato llegó
+    showSpinner('Recargando programaciones...');
+    fetch(API_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({accion:'getProgramacion',usuario:currentUser.username})
+    }).then(function(r2){return r2.json();})
+    .then(function(r2){
       hideSpinner();
-      if(!r.ok){apiErr(r.error||'Error al guardar');return;}
-      db.programaciones[idx]=updated;
+      console.log('[getProgramacion] Respuesta tras guardar:', r2.ok, 'total:', r2.data&&r2.data.length);
+      if(r2.ok&&Array.isArray(r2.data)) db.programaciones=r2.data.map(mapProgFromSheet);
       document.getElementById('progBienSelModal').disabled=false;
       closeModal('progModal');
       document.getElementById('progBienSel').value=bienId;
-      renderProgDetalle();renderDash();showToast('✅ Programación actualizada');
-    }).catch(function(){hideSpinner();apiErr();});
-  } else {
-    const obj={
-      id:'pg'+Date.now(),
-      bienId,
-      codigo_bien:bien?bien.codigo:'',
-      anio:parseInt(anio),tipoMant,periodo,
-      costo:parseFloat(document.getElementById('progCosto').value)||0,
-      months,
-      creadoPor:currentUser.username,
-      creadoEn:new Date().toISOString()
-    };
-    showSpinner('Guardando programación...');
-    api('saveProgramacion',{programacion:mapProgToSheet(obj)}).then(function(r){
+      renderProgDetalle();renderDash();
+      showToast(editingProgId?'✅ Programación actualizada':'✅ Programación guardada');
+    }).catch(function(){
       hideSpinner();
-      if(!r.ok){apiErr(r.error||'Error al guardar');return;}
-      if(r.id) obj.id=r.id;
-      db.programaciones.push(obj);
       document.getElementById('progBienSelModal').disabled=false;
       closeModal('progModal');
       document.getElementById('progBienSel').value=bienId;
-      renderProgDetalle();renderDash();showToast('✅ Programación guardada');
-    }).catch(function(){hideSpinner();apiErr();});
-  }
+      renderProgDetalle();renderDash();
+      showToast(editingProgId?'✅ Programación actualizada':'✅ Programación guardada');
+    });
+  }).catch(function(e){
+    console.error('[saveProg] Error fetch:', e);
+    hideSpinner();apiErr();
+  });
 }
 function updateProgMonthsUI(){
   const p=document.getElementById('progPeriodo').value;
