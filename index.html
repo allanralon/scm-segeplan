@@ -2239,64 +2239,144 @@ function _renderMantUI(bienId,year,filtro,cont){
   cont.innerHTML=html;
 }
 function toggleMant(progId,month,done,bienId,anio){
-  const pg=db.programaciones.find(p=>p.id===progId);
   const b=db.bienes.find(x=>x.id===bienId);
-  const obsActual=(db.mantMap&&db.mantMap[`${progId}_${month}`]||{}).obs||'';
-  const seg={
+  const key=progId+'_'+month;
+  const rec=(db.mantMap&&db.mantMap[key])||{};
+  const obsActual=rec.obs||'';
+
+  // Buscar registro existente en Sheets por id_programacion + mes + anio
+  // para obtener el id_seguimiento y ACTUALIZAR en lugar de crear duplicado
+  var registroExistente=null;
+  if(db.seguimientoRaw&&Array.isArray(db.seguimientoRaw)){
+    registroExistente=db.seguimientoRaw.find(function(s){
+      return s.id_programacion===progId
+          && s.mes===MONTHS[month]
+          && String(s.anio)===String(anio);
+    })||null;
+  }
+
+  var fechaHoy=new Date().toISOString().split('T')[0]; // siempre AAAA-MM-DD
+
+  var seg={
+    id_seguimiento:registroExistente?registroExistente.id_seguimiento:'', // vacio = crear nuevo
     id_programacion:progId,
     id_bien:bienId,
     codigo_bien:b?b.codigo:'',
     mes:MONTHS[month],
     anio:anio||new Date().getFullYear(),
     estado:done?'Ejecutado':'Pendiente',
-    fecha_ejecucion:done?new Date().toISOString().split('T')[0]:'',
+    fecha_ejecucion:done?fechaHoy:'',
     ejecutado_por:done?currentUser.username:'',
     observaciones:obsActual,
     delegacion:currentUser.delegacion||''
   };
+
   showSpinner(done?'Confirmando...':'Desmarcando...');
   api('saveSeguimiento',{seguimiento:seg,usuario:currentUser.username}).then(function(r){
     hideSpinner();
     if(!r.ok){apiErr(r.error||'Error al guardar');return;}
     if(!db.mantMap) db.mantMap={};
-    db.mantMap[`${progId}_${month}`]={
+    db.mantMap[key]={
+      id_seguimiento:registroExistente?registroExistente.id_seguimiento:(r.id||''),
       ejecutado:done,
       fecha:seg.fecha_ejecucion,
       responsable:seg.ejecutado_por,
       obs:obsActual
     };
-    showToast(done?'✔ Mantenimiento confirmado':'↩ Mantenimiento desmarcado');
+    // Actualizar seguimientoRaw en memoria para que la proxima operacion
+    // encuentre el id_seguimiento correcto sin necesidad de recargar
+    if(!db.seguimientoRaw) db.seguimientoRaw=[];
+    if(registroExistente){
+      registroExistente.estado=seg.estado;
+      registroExistente.fecha_ejecucion=seg.fecha_ejecucion;
+      registroExistente.ejecutado_por=seg.ejecutado_por;
+    } else {
+      db.seguimientoRaw.push({
+        id_seguimiento:r.id||'',
+        id_programacion:progId,
+        id_bien:bienId,
+        mes:MONTHS[month],
+        anio:anio||new Date().getFullYear(),
+        estado:seg.estado,
+        fecha_ejecucion:seg.fecha_ejecucion,
+        ejecutado_por:seg.ejecutado_por,
+        observaciones:obsActual,
+        delegacion:seg.delegacion
+      });
+    }
+    showToast(done?'\u2714 Mantenimiento confirmado':'\u21a9 Mantenimiento desmarcado');
     renderMant();renderDash();
   }).catch(function(){hideSpinner();apiErr();});
 }
 function saveObs(progId,month,bienId,anio){
-  const el=document.getElementById(`obs_${progId}_${month}`);
+  const el=document.getElementById('obs_'+progId+'_'+month);
   if(!el) return;
   const val=el.value;
-  const pg=db.programaciones.find(p=>p.id===progId);
   const b=db.bienes.find(x=>x.id===bienId);
-  const rec=db.mantMap&&db.mantMap[`${progId}_${month}`]||{};
-  const seg={
+  const key=progId+'_'+month;
+  const rec=(db.mantMap&&db.mantMap[key])||{};
+
+  // Buscar registro existente para obtener id_seguimiento y NO crear duplicado
+  var registroExistente=null;
+  if(db.seguimientoRaw&&Array.isArray(db.seguimientoRaw)){
+    registroExistente=db.seguimientoRaw.find(function(s){
+      return s.id_programacion===progId
+          && s.mes===MONTHS[month]
+          && String(s.anio)===String(anio);
+    })||null;
+  }
+
+  // Fecha: usar la ya guardada en el registro existente (ya en AAAA-MM-DD),
+  // o la del mantMap. Nunca generar fecha nueva si el estado no cambia.
+  var fechaExistente='';
+  if(registroExistente&&registroExistente.fecha_ejecucion){
+    // Normalizar por si vino con formato ISO completo de un registro previo
+    fechaExistente=String(registroExistente.fecha_ejecucion).split('T')[0];
+  } else if(rec.fecha){
+    fechaExistente=String(rec.fecha).split('T')[0];
+  }
+
+  var seg={
+    id_seguimiento:registroExistente?registroExistente.id_seguimiento:'',
     id_programacion:progId,
     id_bien:bienId,
     codigo_bien:b?b.codigo:'',
     mes:MONTHS[month],
     anio:anio||new Date().getFullYear(),
     estado:rec.ejecutado?'Ejecutado':'Pendiente',
-    fecha_ejecucion:rec.fecha||'',
+    fecha_ejecucion:fechaExistente,
     ejecutado_por:rec.responsable||'',
     observaciones:val,
     delegacion:currentUser.delegacion||''
   };
+
   api('saveSeguimiento',{seguimiento:seg,usuario:currentUser.username}).then(function(r){
     if(!r.ok){return;}
     if(!db.mantMap) db.mantMap={};
-    if(!db.mantMap[`${progId}_${month}`]) db.mantMap[`${progId}_${month}`]={ejecutado:false};
-    db.mantMap[`${progId}_${month}`].obs=val;
+    if(!db.mantMap[key]) db.mantMap[key]={ejecutado:false};
+    db.mantMap[key].obs=val;
+    // Actualizar seguimientoRaw en memoria
+    if(registroExistente){
+      registroExistente.observaciones=val;
+    } else if(r.id){
+      if(!db.seguimientoRaw) db.seguimientoRaw=[];
+      db.seguimientoRaw.push({
+        id_seguimiento:r.id,
+        id_programacion:progId,
+        id_bien:bienId,
+        mes:MONTHS[month],
+        anio:anio||new Date().getFullYear(),
+        estado:seg.estado,
+        fecha_ejecucion:seg.fecha_ejecucion,
+        ejecutado_por:seg.ejecutado_por,
+        observaciones:val,
+        delegacion:seg.delegacion
+      });
+    }
     el.style.borderColor='var(--success)';
-    const ind=document.getElementById(`obs_ind_${progId}_${month}`);
-    if(ind){ind.textContent='✔ Guardado';ind.style.color='var(--success)';ind.style.opacity='1';}
-    setTimeout(()=>{el.style.borderColor='';if(ind){ind.style.opacity='0';}},2000);
+    const ind=document.getElementById('obs_ind_'+progId+'_'+month);
+    if(ind){ind.textContent='\u2714 Guardado';ind.style.color='var(--success)';ind.style.opacity='1';}
+    setTimeout(function(){el.style.borderColor='';if(ind){ind.style.opacity='0';}},2000);
   }).catch(function(){});
 }
 
