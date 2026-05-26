@@ -379,7 +379,7 @@ select:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 2px rgba(59,130,
     display:flex!important;
     width:220px;min-width:220px;background:#1e293b;height:100vh;
     position:sticky;top:0;flex-direction:column;z-index:90;
-    flex-shrink:0;overflow-y:auto;}
+    flex-shrink:0;overflow-y:auto;position:relative;}
 
   /* Topbar se convierte en header del sidebar */
   .topbar{
@@ -515,16 +515,23 @@ select:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 2px rgba(59,130,
       <span style="color:var(--accent);cursor:pointer;font-weight:600;" onclick="openRecuperarModal()">Recuperar acceso</span>
     </p>
   </div>
+  <div style="text-align:center; color:rgba(255,255,255,0.3); font-size:10px; margin-top:24px;">
+    Versión 2.6.5.26
+  </div>
 </div>
 
 <!-- ===== APP ===== -->
 <div id="app">
 
   <!-- SIDEBAR DESKTOP (solo visible ≥768px via CSS) -->
-  <aside class="sidebar-desktop">
-    <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.1);">
-      <div style="background:white;border-radius:8px;padding:6px 10px;display:inline-block;">
-        <img src="logo.png" alt="SEGEPLAN" style="height:36px;width:auto;display:block;">
+  <aside class="sidebar-desktop" style="position:relative;">
+    <div style="padding:16px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; gap:10px;">
+      <div style="background:white; border-radius:8px; padding:5px 8px; flex-shrink:0;">
+        <img src="logo.png" alt="SEGEPLAN" style="height:32px; width:auto; display:block;">
+      </div>
+      <div>
+        <div style="color:white; font-size:12px; font-weight:600; line-height:1.3;">Sistema de Control<br>de Mantenimiento</div>
+        <div style="color:rgba(255,255,255,0.6); font-size:10px; margin-top:1px;">SEGEPLAN</div>
       </div>
     </div>
 
@@ -565,6 +572,9 @@ select:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 2px rgba(59,130,
       <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
       Catálogos
     </div>
+    <div style="position:absolute; bottom:16px; left:0; right:0; text-align:center; color:rgba(255,255,255,0.3); font-size:10px;">
+      Versión 2.6.5.26
+    </div>
   </aside>
 
   <!-- CONTENT WRAP (permite flex-row en desktop) -->
@@ -573,9 +583,16 @@ select:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 2px rgba(59,130,
   <!-- TOPBAR MÓVIL (solo visible <768px) -->
   <div class="topbar">
     <div class="topbar-left" style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-      <div class="topbar-logo" style="flex-shrink:0;background:transparent;border:none;padding:0;"><div style="background:white;border-radius:6px;padding:3px 6px;display:inline-flex;align-items:center;"><img src="logo.png" alt="SEGEPLAN" style="height:28px;width:auto;"></div></div>
-      <div class="topbar-title" style="min-width:0;">
-        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.75);letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">SEGEPLAN</div>
+      <div class="topbar-logo" style="flex-shrink:0;background:transparent;border:none;padding:0;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="background:white; border-radius:6px; padding:3px 6px;">
+            <img src="logo.png" alt="SEGEPLAN" style="height:28px; width:auto; display:block;">
+          </div>
+          <div class="topbar-title" style="min-width:0;">
+            <div style="color:white; font-size:12px; font-weight:600; line-height:1.2; white-space:nowrap;">Control de Mant.</div>
+            <div style="color:rgba(255,255,255,0.7); font-size:10px;">SEGEPLAN</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="topbar-right" style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
